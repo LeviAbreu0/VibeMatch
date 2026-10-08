@@ -23,14 +23,28 @@ export type Track = {
 };
 
 const BASE = "https://api.deezer.com";
-/** Proxy local pra web (server/proxy.js). No Android/iOS o fetch é direto. */
-const WEB_PROXY = "http://localhost:3001";
+/** Proxy local pra web em dev (server/proxy.js). */
+const DEV_PROXY = "http://localhost:3001";
 
+const LOCAL_HOSTS = ["localhost", "127.0.0.1", ""];
+
+/**
+ * A Deezer não envia CORS, então no web passamos por um proxy:
+ * - dev local (localhost): server/proxy.js em localhost:3001
+ * - produção (vercel.app):  function serverless em /api/deezer
+ * No Android/iOS o fetch é direto (sem CORS).
+ *
+ * A escolha é feita em runtime pelo hostname — assim não depende de
+ * NODE_ENV ser inlineado certo no bundle.
+ */
 function endpoint(path: string): string {
-  if (typeof window !== "undefined" && Platform.OS === "web") {
-    return `${WEB_PROXY}${path}`;
+  const isWeb = typeof window !== "undefined" && Platform.OS === "web";
+  if (!isWeb) return `${BASE}${path}`;
+
+  if (LOCAL_HOSTS.includes(window.location.hostname)) {
+    return `${DEV_PROXY}${path}`;
   }
-  return `${BASE}${path}`;
+  return `/api/deezer?p=${encodeURIComponent(path)}`;
 }
 
 async function getJSON<T>(path: string): Promise<T> {
