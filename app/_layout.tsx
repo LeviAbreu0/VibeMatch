@@ -1,20 +1,11 @@
-import { useEffect } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Audio } from "expo-av";
+import { AudioProvider } from "../context/AudioContext";
 import { colors } from "../lib/theme";
 
 export default function RootLayout() {
-  useEffect(() => {
-    // permite tocar áudio mesmo com o botão de mudo do celular
-    Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
-    }).catch(() => {});
-  }, []);
-
   return (
-    <>
+    <AudioProvider>
       <StatusBar style="light" />
       <Stack
         screenOptions={{
@@ -26,6 +17,6 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="track/[id]" />
       </Stack>
-    </>
+    </AudioProvider>
   );
 }

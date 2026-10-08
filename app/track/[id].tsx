@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -11,10 +11,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Audio } from "expo-av";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { TrackCard } from "../../components/TrackCard";
+import { useAudio } from "../../context/AudioContext";
 import {
   getRelatedTracks,
   getTrack,
@@ -27,14 +27,11 @@ type Status = "loading" | "ready" | "error";
 export default function TrackScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { playingId, loadingId, toggle, stop } = useAudio();
 
   const [track, setTrack] = useState<Track | null>(null);
   const [related, setRelated] = useState<Track[]>([]);
   const [status, setStatus] = useState<Status>("loading");
-
-  const [playing, setPlaying] = useState(false);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const soundRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,40 +60,18 @@ export default function TrackScreen() {
 
     return () => {
       cancelled = true;
-      soundRef.current?.unloadAsync().catch(() => {});
+      // sai da tela → para a prévia
+      stop().catch(() => {});
     };
-  }, [id]);
+  }, [id, stop]);
 
-  const togglePreview = async () => {
+  const heroPlaying = !!track && playingId === track.id;
+  const heroLoading = !!track && loadingId === track.id;
+
+  const togglePreview = () => {
     if (!track) return;
     Haptics.selectionAsync().catch(() => {});
-    try {
-      if (soundRef.current && playing) {
-        await soundRef.current.stopAsync();
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
-        setPlaying(false);
-        return;
-      }
-      setPreviewLoading(true);
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: track.preview },
-        { shouldPlay: true }
-      );
-      soundRef.current = sound;
-      setPlaying(true);
-      setPreviewLoading(false);
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          setPlaying(false);
-          sound.unloadAsync().catch(() => {});
-          soundRef.current = null;
-        }
-      });
-    } catch {
-      setPreviewLoading(false);
-      setPlaying(false);
-    }
+    void toggle(track);
   };
 
   if (status === "loading") {
@@ -139,7 +114,10 @@ export default function TrackScreen() {
           <View>
             {/* Música escolhida */}
             <View style={styles.hero}>
-              <Image source={{ uri: track.album.cover_big ?? track.album.cover_medium }} style={styles.heroCover} />
+              <Image
+                source={{ uri: track.album?.cover_big ?? track.album?.cover_medium }}
+                style={styles.heroCover}
+              />
               <Text style={styles.heroTitle} numberOfLines={2}>
                 {track.title}
               </Text>
@@ -152,20 +130,20 @@ export default function TrackScreen() {
 
               <View style={styles.heroActions}>
                 <TouchableOpacity
-                  style={[styles.previewBtn, playing && styles.previewBtnActive]}
+                  style={[styles.previewBtn, heroPlaying && styles.previewBtnActive]}
                   onPress={togglePreview}
                 >
-                  {previewLoading ? (
+                  {heroLoading ? (
                     <ActivityIndicator size="small" color={colors.text} />
                   ) : (
                     <Ionicons
-                      name={playing ? "pause" : "play"}
+                      name={heroPlaying ? "pause" : "play"}
                       size={18}
                       color={colors.text}
                     />
                   )}
                   <Text style={styles.previewText}>
-                    {playing ? "Tocando..." : "Ouvir prévia"}
+                    {heroPlaying ? "Tocando..." : "Ouvir prévia"}
                   </Text>
                 </TouchableOpacity>
 

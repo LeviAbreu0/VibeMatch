@@ -23,17 +23,14 @@ export type Track = {
 };
 
 const BASE = "https://api.deezer.com";
+/** Proxy local pra web (server/proxy.js). No Android/iOS o fetch é direto. */
+const WEB_PROXY = "http://localhost:3001";
 
-/**
- * No web a Deezer não envia cabeçalhos CORS, então passamos por um proxy
- * público. No Android/iOS (Expo Go / build) o fetch direto funciona normal.
- */
 function endpoint(path: string): string {
-  const url = `${BASE}${path}`;
   if (typeof window !== "undefined" && Platform.OS === "web") {
-    return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    return `${WEB_PROXY}${path}`;
   }
-  return url;
+  return `${BASE}${path}`;
 }
 
 async function getJSON<T>(path: string): Promise<T> {
@@ -71,12 +68,35 @@ export async function getRelatedArtists(artistId: number, limit = 4): Promise<Ar
   return (data.data ?? []).slice(0, limit);
 }
 
-/** Faixas da mesma álbum. */
-export async function getAlbumTracks(albumId: number, limit = 10): Promise<Track[]> {
-  const data = await getJSON<{ data: Track[] }>(
-    `/album/${albumId}/tracks?limit=${limit}`
-  );
-  return (data.data ?? []).filter((t) => t.preview);
+/**
+ * Faixas da mesma álbum.
+ *
+ * Usamos /album/{id} (detalhe) porque traz a capa E as faixas já com o
+ * objeto `album` preenchido — diferente de /album/{id}/tracks, que vem sem.
+ */
+export async function getAlbumTracks(
+  albumId: number,
+  album?: Album,
+  limit = 10
+): Promise<Track[]> {
+  const detail = await getJSON<{
+    title?: string;
+    cover_medium?: string;
+    cover_big?: string;
+    tracks?: { data?: Track[] };
+  }>(`/album/${albumId}`);
+
+  const albumInfo: Album = album ?? {
+    id: albumId,
+    title: detail.title ?? "",
+    cover_medium: detail.cover_medium ?? "",
+    cover_big: detail.cover_big,
+  };
+
+  return (detail.tracks?.data ?? [])
+    .filter((t) => t.preview)
+    .slice(0, limit)
+    .map((t) => ({ ...t, album: t.album ?? albumInfo }));
 }
 
 /**
@@ -96,7 +116,7 @@ export async function getRelatedTracks(track: Track): Promise<Track[]> {
   const [ownTop, relatedArtists, albumTracks, covers] = await Promise.all([
     getArtistTop(track.artist.id, 8).catch(() => [] as Track[]),
     getRelatedArtists(track.artist.id, 4).catch(() => [] as Artist[]),
-    getAlbumTracks(track.album.id, 10).catch(() => [] as Track[]),
+    getAlbumTracks(track.album.id, track.album, 10).catch(() => [] as Track[]),
     searchTracks(track.title).catch(() => [] as Track[]),
   ]);
 

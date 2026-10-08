@@ -1,9 +1,15 @@
-import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { Audio } from "expo-av";
+import {
+  ActivityIndicator,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import type { Track } from "../lib/deezer";
+import { useAudio } from "../context/AudioContext";
 import { colors, radius, spacing } from "../lib/theme";
 
 type Props = {
@@ -15,58 +21,20 @@ type Props = {
 };
 
 export function TrackCard({ track, onPress, playable = true, index }: Props) {
-  const [playing, setPlaying] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const { playingId, loadingId, toggle } = useAudio();
+  const isPlaying = playingId === track.id;
+  const isLoading = loadingId === track.id;
 
-  useEffect(() => {
-    return () => {
-      soundRef.current?.unloadAsync().catch(() => {});
-    };
-  }, []);
-
-  const togglePreview = async () => {
+  const handlePreview = () => {
     Haptics.selectionAsync().catch(() => {});
-    try {
-      if (soundRef.current && playing) {
-        await soundRef.current.stopAsync();
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
-        setPlaying(false);
-        return;
-      }
-
-      setLoading(true);
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: track.preview },
-        { shouldPlay: true }
-      );
-      soundRef.current = sound;
-      setPlaying(true);
-      setLoading(false);
-
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          setPlaying(false);
-          sound.unloadAsync().catch(() => {});
-          soundRef.current = null;
-        }
-      });
-    } catch {
-      setLoading(false);
-      setPlaying(false);
-    }
+    void toggle(track);
   };
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={onPress}
-      style={styles.card}
-    >
+    <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={styles.card}>
       {typeof index === "number" && <Text style={styles.rank}>{index + 1}</Text>}
 
-      <Image source={{ uri: track.album.cover_medium }} style={styles.cover} />
+      <Image source={{ uri: track.album?.cover_medium }} style={styles.cover} />
 
       <View style={styles.info}>
         <Text style={styles.title} numberOfLines={1}>
@@ -79,17 +47,17 @@ export function TrackCard({ track, onPress, playable = true, index }: Props) {
 
       {playable && (
         <TouchableOpacity
-          onPress={togglePreview}
-          style={[styles.playBtn, playing && styles.playBtnActive]}
+          onPress={handlePreview}
+          style={[styles.playBtn, isPlaying && styles.playBtnActive]}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          {loading ? (
+          {isLoading ? (
             <ActivityIndicator size="small" color={colors.primary} />
           ) : (
             <Ionicons
-              name={playing ? "pause" : "play"}
+              name={isPlaying ? "pause" : "play"}
               size={18}
-              color={playing ? colors.text : colors.primary}
+              color={isPlaying ? colors.text : colors.primary}
             />
           )}
         </TouchableOpacity>
