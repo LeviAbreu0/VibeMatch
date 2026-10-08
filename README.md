@@ -1,50 +1,62 @@
-# Welcome to your Expo app 👋
+# 🎧 VibeMatch
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+App mobile pra descobrir músicas. **Escolha uma música e veja outras com a mesma vibe.**
 
-## Get started
+Feito com **Expo + React Native + TypeScript** e a [Deezer API](https://developers.deezer.com/api) (gratuita, sem API key).
 
-1. Install dependencies
+## ✨ Funcionalidades
 
-   ```bash
-   npm install
-   ```
+- 🔍 **Busca em tempo real** — digite o nome da música ou artista (com debounce)
+- 🎵 **Músicas relacionadas** — combina várias fontes pra achar a vibe certa:
+  - top do próprio artista
+  - artistas parecidos
+  - outras faixas do mesmo álbum
+  - covers e versões da mesma música (pra faixas nichadas)
+- ▶️ **Prévia de 30s** — ouça um trecho direto no app
+- 🌐 **Abre no Deezer** — link direto pra ouvir a faixa completa
+- 🎨 **Tema escuro** com destaque roxo
+- 📱 **Haptics** nos toques
 
-2. Start the app
+## 🛠️ Stack
 
-   ```bash
-   npx expo start
-   ```
+| Camada | Tecnologia |
+| --- | --- |
+| Framework | React Native 0.79 + Expo SDK 53 |
+| Roteamento | expo-router |
+| Áudio | expo-av |
+| Linguagem | TypeScript |
+| API | Deezer (pública) |
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## 🚀 Rodando
 
 ```bash
-npm run reset-project
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Escaneie o QR code com o **Expo Go** (Android/iOS) ou pressione `a`/`i` pra abrir no emulador.
 
-## Learn more
+> **Nota (web):** a Deezer não envia cabeçalhos CORS, então no navegador as requisições passam por um proxy público. No Android/iOS o fetch é direto.
 
-To learn more about developing your project with Expo, look at the following resources:
+## 📁 Estrutura
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```
+app/
+  _layout.tsx      # tema escuro + setup de áudio
+  index.tsx        # tela de busca
+  track/[id].tsx   # música escolhida + relacionadas
+components/
+  SearchBar.tsx    # input com debounce
+  TrackCard.tsx    # card de música (com botão de prévia)
+lib/
+  deezer.ts        # client da API + lógica de relacionados
+  theme.ts         # cores e espaçamento
+```
 
-## Join the community
+## 🔑 Ideia por trás
 
-Join our community of developers creating universal apps.
+A Deezer **não tem endpoint de "relacionados" por música**, então o `getRelatedTracks` em `lib/deezer.ts` combina top de artistas, artistas parecidos, álbum e busca por título — e depois remove duplicatas. Assim funciona tanto pra hits famosos quanto pra faixas nichadas (uploads de usuário), que são justamente as que mais aparecem em playlists de J-rock/Vocaloid.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+---
+
+Feito por [Levi Abreu](https://github.com/LeviAbreu0)

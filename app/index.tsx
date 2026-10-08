@@ -1,57 +1,124 @@
-import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
-type Musica = {
-  id: string;
-  titulo: string;
-  artista: string;
-  capa: string;
-};
-
-const musicas: Musica[] = [
-  { id: '1', titulo: 'ロキ', artista: 'みきとP', capa: 'https://i1.sndcdn.com/artworks-nB3GFFPQmS8rUH5d-ErCB4Q-t500x500.jpg' },
-  { id: '2', titulo: 'ギミチョコー！！', artista: 'ベビーメタル', capa: 'https://i.scdn.co/image/ab67616d0000b273a2e65e6a12911e93583f529d' },
-  { id: '3', titulo: 'ライアーダンサー', artista: '重音テト', capa: 'https://i.scdn.co/image/ab67616d0000b273a0973e85ad2e83d847fa4fe6' },
-  { id: '4', titulo: '"青のすみか', artista: 'キタニタツヤ', capa: 'https://m.media-amazon.com/images/I/51X+IWqR+mL._UXNaN_FMjpg_QL85_.jpg' },
-  { id: '5', titulo: 'メズマライザー', artista: 'サツキ', capa: 'https://m.media-amazon.com/images/I/517oVPJFFOL._UXNaN_FMjpg_QL85_.jpg' },
-  { id: '6', titulo: 'テトリス', artista: '柊マグネタイト', capa: 'https://m.media-amazon.com/images/I/41sp6WGUPlL._UXNaN_FMjpg_QL85_.jpg' },
-  { id: '7', titulo: 'Billie Jean - SynthV cover by Kasane Teto', artista: '重音テト & Michael Jackson', capa: 'https://i.ytimg.com/vi/RdUccsrVjh8/sddefault.jpg' },
-  { id: '10', titulo: '廻廻奇譚', artista: 'Eve', capa: 'https://m.media-amazon.com/images/I/51NE6DvJ2VL._UXNaN_FMjpg_QL85_.jpg' },
-];
+import { useCallback, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Keyboard,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { SearchBar } from "../components/SearchBar";
+import { TrackCard } from "../components/TrackCard";
+import { searchTracks, type Track } from "../lib/deezer";
+import { colors, spacing } from "../lib/theme";
 
 export default function Index() {
-  const exibirMusica = ({ item }: { item: Musica }) => (
-    <TouchableOpacity
-      onPress={() => console.log(`Tocando ${item.titulo}`)}
-      style={styles.item}
-    >
-      <Image source={{ uri: item.capa }} style={styles.capa} />
-      <View style={styles.info}>
-        <Text style={styles.titulo}>{item.titulo}</Text>
-        <Text style={styles.artista}>{item.artista}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const router = useRouter();
+  const [results, setResults] = useState<Track[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const reqId = useRef(0);
+
+  const handleSearch = useCallback(async (q: string) => {
+    setQuery(q);
+    if (!q) {
+      setResults([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    const id = ++reqId.current;
+    setLoading(true);
+    setError(null);
+    try {
+      const tracks = await searchTracks(q);
+      if (id !== reqId.current) return; // resposta antiga, descarta
+      setResults(tracks);
+    } catch {
+      if (id !== reqId.current) return;
+      setError("Não consegui buscar agora. Tente de novo.");
+      setResults([]);
+    } finally {
+      if (id === reqId.current) setLoading(false);
+    }
+  }, []);
+
+  const openTrack = (track: Track) => {
+    Keyboard.dismiss();
+    router.push(`/track/${track.id}`);
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header fixo no topo */}
-      <View style={styles.headerContainer}>
-        <Text style={styles.header}>VibeMatch</Text>
-        <Image
-          source={{ uri: 'https://i.pinimg.com/736x/68/9a/a6/689aa60e1e7b72796a373c965d7f9fa6.jpg' }}
-          style={styles.avatar}
-        />
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <View style={styles.header}>
+        <Text style={styles.logo}>
+          Vibe<span style={styles.logoAccent}>Match</span>
+        </Text>
+        <Text style={styles.subtitle}>
+          Escolha uma música e descubra outras com a mesma vibe
+        </Text>
       </View>
 
-      {/* Lista de músicas */}
-      <FlatList
-        data={musicas}
-        keyExtractor={(item) => item.id}
-        renderItem={exibirMusica}
-        contentContainerStyle={styles.lista}
-        showsVerticalScrollIndicator={false}
-      />
+      <View style={styles.searchWrap}>
+        <SearchBar onSearch={handleSearch} />
+      </View>
+
+      {loading && (
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.primary} size="large" />
+        </View>
+      )}
+
+      {!loading && error && (
+        <View style={styles.center}>
+          <Ionicons name="cloud-offline-outline" size={44} color={colors.textFaint} />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
+      {!loading && !error && results.length === 0 && (
+        <View style={styles.center}>
+          <View style={styles.iconBubble}>
+            <Ionicons
+              name={query ? "musical-notes-outline" : "sparkles-outline"}
+              size={40}
+              color={colors.primary}
+            />
+          </View>
+          <Text style={styles.emptyTitle}>
+            {query ? "Nada encontrado" : "Comece a buscar"}
+          </Text>
+          <Text style={styles.emptyText}>
+            {query
+              ? `Nenhuma música para “${query}”. Tente outro nome.`
+              : "Digite o nome de uma música ou artista e veja as relacionadas."}
+          </Text>
+        </View>
+      )}
+
+      {!loading && !error && results.length > 0 && (
+        <FlatList
+          data={results}
+          keyExtractor={(item) => String(item.id)}
+          keyboardShouldPersistTaps="handled"
+          renderItem={({ item }) => (
+            <TrackCard track={item} onPress={() => openTrack(item)} playable={false} />
+          )}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <Text style={styles.resultCount}>
+              {results.length} resultado{results.length === 1 ? "" : "s"} — toque pra ver as
+              relacionadas
+            </Text>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -59,57 +126,72 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    backgroundColor: colors.bg,
   },
   header: {
-    fontSize: 22,
-    color: '#fff',
-    fontWeight: 'bold',
-    padding: 8,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  logo: {
+    color: colors.text,
+    fontSize: 28,
+    fontWeight: "800",
+    letterSpacing: -0.5,
   },
-  lista: {
-    paddingHorizontal: 16,
-    paddingBottom: 80,
+  logoAccent: {
+    color: colors.primary,
   },
-  item: {
-    flexDirection: 'row',
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderColor: '#444',
-    paddingBottom: 12,
-    alignItems: 'center',
-  },
-  capa: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    marginRight: 12,
-  },
-  info: {
-    flex: 1,
-  },
-  titulo: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  artista: {
-    color: '#ccc',
+  subtitle: {
+    color: colors.textMuted,
     fontSize: 14,
+    marginTop: spacing.xs,
+    lineHeight: 20,
+  },
+  searchWrap: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  list: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl * 2,
+  },
+  resultCount: {
+    color: colors.textFaint,
+    fontSize: 12,
+    marginBottom: spacing.md,
+  },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xl,
+    gap: spacing.sm,
+  },
+  iconBubble: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: colors.primaryDim,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.sm,
+  },
+  emptyTitle: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: "600",
+  },
+  emptyText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  errorText: {
+    color: colors.danger,
+    fontSize: 14,
+    textAlign: "center",
+    marginTop: spacing.xs,
   },
 });
